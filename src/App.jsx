@@ -55,7 +55,7 @@ export default function App() {
     const [receipt, setReceipt] = useState(null)
     const [addModal, setAddModal] = useState(null)
     const [authOpen, setAuthOpen] = useState(false)
-    const [websiteSession, setWebsiteSession] = useState(true)
+    const [websiteSession, setWebsiteSession] = useState(!isSupabaseConfigured)
     const [toast, setToast] = useState('')
     const [authLoading, setAuthLoading] = useState(isSupabaseConfigured)
     const [profileError, setProfileError] = useState('')
@@ -69,7 +69,8 @@ export default function App() {
             const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
             if (!active) return
             if (sessionError) { setAuthLoading(false); setConnection({ kind: 'error', label: 'Supabase Error', message: classifySupabaseError(sessionError) }); return }
-            if (!sessionData.session) { setAuthLoading(false); setConnection({ kind: 'offline', label: 'Supabase Offline', message: 'Sign in to load Supabase data' }); setAuthOpen(true); return }
+            if (!sessionData.session) { setWebsiteSession(false); setAuthLoading(false); setConnection({ kind: 'offline', label: 'Supabase Offline', message: 'Sign in to load Supabase data' }); setAuthOpen(true); return }
+            setWebsiteSession(true)
             const userId = sessionData.session.user.id
             setProfileError('')
             const { data: profile, error: profileQueryError } = await supabase.from('profiles').select('full_name,role,phone,is_active').eq('id', userId).maybeSingle()
@@ -103,7 +104,7 @@ export default function App() {
     }, [])
 
     const notify = (message) => { setToast(message); window.setTimeout(() => setToast(''), 2400) }
-    const signOut = () => { setWebsiteSession(false); setAuthOpen(true); setConnection({ kind: 'offline', label: 'Supabase Offline', message: 'Sign in to load Supabase data' }); setPaymentOpen(false); setAddModal(null); notify('Signed out from this website') }
+    const signOut = async () => { if (supabase) await supabase.auth.signOut(); setWebsiteSession(false); setAuthOpen(true); setConnection({ kind: 'offline', label: 'Supabase Offline', message: 'Sign in to load Supabase data' }); setPaymentOpen(false); setAddModal(null); notify('Signed out from this website') }
     const requireSession = async () => { if (!websiteSession) { setAddModal(null); setAuthOpen(true); notify('Sign in to this website before saving data'); return false } if (!supabase) return true; const { data, error } = await supabase.auth.getSession(); if (error) { notify(classifySupabaseError(error)); return false } if (data.session) return true; setAddModal(null); setAuthOpen(true); notify('Sign in before saving data'); return false }
     const signIn = async (email, password) => { if (!supabase) return supabaseConfigError; const { error } = await supabase.auth.signInWithPassword({ email, password }); if (error) return classifySupabaseError(error).includes('authentication') ? 'Invalid email or password.' : classifySupabaseError(error); setWebsiteSession(true); setAuthOpen(false); notify('Signed in successfully; loading database'); return '' }
     const filteredMenu = menu.filter((item) => (category === 'All' || item.category === category) && item.name.toLowerCase().includes(query.toLowerCase()))
@@ -155,5 +156,6 @@ export default function App() {
         Settings: <Settings dark={dark} setDark={setDark} />,
     }
     const saveAddRecord = { menu: saveMenuItem, inventory: saveInventoryItem, customer: saveCustomer, staff: saveStaff, table: saveTable }
-    return <div className={dark ? 'app dark' : 'app'}><Sidebar page={page} onNavigate={setPage} onLogout={signOut} /><main className="main"><Header page={page} query={query} setQuery={setQuery} dark={dark} setDark={setDark} onMobileMenu={() => setPage(page === 'Dashboard' ? 'New Order' : 'Dashboard')} onNotify={notify} connection={connection} />{authLoading && <div className="connection-message">Checking authentication...</div>}{profileError && <div className="connection-message">{profileError}</div>}{content[page]}</main>{paymentOpen && <PaymentModal total={money(billingOrder ? billingOrder.total : total)} onClose={() => { setPaymentOpen(false); setBillingOrder(null) }} onConfirm={completePayment} />}{receipt && <Invoice receipt={receipt} onClose={() => setReceipt(null)} onNewOrder={() => { setReceipt(null); setCart([]); setPage('New Order') }} />}{addModal && <AddModal type={addModal} onClose={() => setAddModal(null)} onSave={saveAddRecord[addModal]} />}{authOpen && <AuthModal onClose={() => setAuthOpen(false)} onSignIn={signIn} />}{toast && <div className="toast">✓ &nbsp;{toast}</div>}</div>
+    if (!websiteSession) return <div className={dark ? 'app dark auth-app' : 'app auth-app'}><AuthModal fullPage onClose={() => setAuthOpen(false)} onSignIn={signIn} /></div>
+    return <div className={dark ? 'app dark' : 'app'}><Sidebar page={page} onNavigate={setPage} onLogin={() => setAuthOpen(true)} onLogout={signOut} isLoggedIn={websiteSession} /><main className="main"><Header page={page} query={query} setQuery={setQuery} dark={dark} setDark={setDark} onMobileMenu={() => setPage(page === 'Dashboard' ? 'New Order' : 'Dashboard')} onNotify={notify} connection={connection} />{authLoading && <div className="connection-message">Checking authentication...</div>}{profileError && <div className="connection-message">{profileError}</div>}{content[page]}</main>{paymentOpen && <PaymentModal total={money(billingOrder ? billingOrder.total : total)} onClose={() => { setPaymentOpen(false); setBillingOrder(null) }} onConfirm={completePayment} />}{receipt && <Invoice receipt={receipt} onClose={() => setReceipt(null)} onNewOrder={() => { setReceipt(null); setCart([]); setPage('New Order') }} />}{addModal && <AddModal type={addModal} onClose={() => setAddModal(null)} onSave={saveAddRecord[addModal]} />}{authOpen && <AuthModal onClose={() => setAuthOpen(false)} onSignIn={signIn} />}{toast && <div className="toast">✓ &nbsp;{toast}</div>}</div>
 }
