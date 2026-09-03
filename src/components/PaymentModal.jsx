@@ -1,0 +1,6 @@
+import { useState } from 'react'
+
+export default function PaymentModal({ total, onClose, onConfirm }) {
+    const [method, setMethod] = useState('UPI')
+    return <div className="modal-backdrop" onClick={(event) => event.target === event.currentTarget && onClose()}><div className="modal"><div className="modal-head"><h2>Complete payment</h2><button className="close" onClick={onClose}>×</button></div><div className="payment-total"><small>Amount payable</small><strong>₹{total}</strong></div><div className="payment-tabs">{['Cash', 'UPI', 'Card'].map((item) => <button type="button" className={method === item ? 'active' : ''} onClick={() => setMethod(item)} key={item}>{item}</button>)}</div>{method === 'UPI' ? <><div className="qr"></div><p className="muted" style={{ textAlign: 'center' }}>Scan with any UPI app to pay</p></> : <div className="form-field" style={{ margin: '18px 0' }}><label>{method === 'Cash' ? 'AMOUNT RECEIVED' : 'CARD PAYMENT'}</label><input placeholder={method === 'Cash' ? '₹ Enter amount' : 'Transaction reference (optional)'} /></div>}<button className="primary" style={{ width: '100%', marginTop: 18 }} onClick={() => onConfirm(method.toLowerCase())}>Confirm payment</button></div></div>
+}
